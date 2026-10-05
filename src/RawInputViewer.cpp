@@ -16,8 +16,113 @@
 #include <iterator>
 #include <limits>
 #include <map>
+#include <variant>
 
 BEGIN_ANONYMOUS_NAMESPACE
+
+class RawMouse final : public RAWMOUSE
+{
+public:
+    explicit RawMouse(const RAWMOUSE& rawMouse) noexcept
+        : RAWMOUSE{rawMouse}
+    {
+    }
+
+    void setDeviceIndex(uint32_t index) noexcept
+    {
+        deviceIndex_ = index > overflowDeviceIndex ? overflowDeviceIndex : index;
+    }
+
+    [[nodiscard]] uint32_t getDeviceIndex() const noexcept
+    {
+        return deviceIndex_;
+    }
+
+private:
+    uint32_t deviceIndex_{injectedDeviceIndex};
+};
+
+using InputEvent = std::variant<RawKeyboard, RawMouse>;
+
+[[nodiscard]] std::wstring mouseEventName(const RawMouse& rawMouse)
+{
+    std::wstring name;
+    const auto append = [&name](std::wstring_view eventName)
+    {
+        if (!name.empty())
+        {
+            name += L", ";
+        }
+        name += eventName;
+    };
+
+    if ((rawMouse.usButtonFlags & RI_MOUSE_LEFT_BUTTON_DOWN) != 0)
+    {
+        append(L"Left Button Down");
+    }
+    if ((rawMouse.usButtonFlags & RI_MOUSE_LEFT_BUTTON_UP) != 0)
+    {
+        append(L"Left Button Up");
+    }
+    if ((rawMouse.usButtonFlags & RI_MOUSE_RIGHT_BUTTON_DOWN) != 0)
+    {
+        append(L"Right Button Down");
+    }
+    if ((rawMouse.usButtonFlags & RI_MOUSE_RIGHT_BUTTON_UP) != 0)
+    {
+        append(L"Right Button Up");
+    }
+    if ((rawMouse.usButtonFlags & RI_MOUSE_MIDDLE_BUTTON_DOWN) != 0)
+    {
+        append(L"Middle Button Down");
+    }
+    if ((rawMouse.usButtonFlags & RI_MOUSE_MIDDLE_BUTTON_UP) != 0)
+    {
+        append(L"Middle Button Up");
+    }
+    if ((rawMouse.usButtonFlags & RI_MOUSE_BUTTON_4_DOWN) != 0)
+    {
+        append(L"Button 4 Down");
+    }
+    if ((rawMouse.usButtonFlags & RI_MOUSE_BUTTON_4_UP) != 0)
+    {
+        append(L"Button 4 Up");
+    }
+    if ((rawMouse.usButtonFlags & RI_MOUSE_BUTTON_5_DOWN) != 0)
+    {
+        append(L"Button 5 Down");
+    }
+    if ((rawMouse.usButtonFlags & RI_MOUSE_BUTTON_5_UP) != 0)
+    {
+        append(L"Button 5 Up");
+    }
+    if ((rawMouse.usButtonFlags & RI_MOUSE_WHEEL) != 0)
+    {
+        append(std::format(L"Wheel ({})", static_cast<SHORT>(rawMouse.usButtonData)));
+    }
+    if ((rawMouse.usButtonFlags & RI_MOUSE_HWHEEL) != 0)
+    {
+        append(std::format(L"Horizontal Wheel ({})", static_cast<SHORT>(rawMouse.usButtonData)));
+    }
+    if ((rawMouse.usFlags & MOUSE_ATTRIBUTES_CHANGED) != 0)
+    {
+        append(L"Attributes Changed");
+    }
+
+    if (name.empty())
+    {
+        if (rawMouse.lLastX != 0 || rawMouse.lLastY != 0)
+        {
+            name = (rawMouse.usFlags & MOUSE_MOVE_ABSOLUTE) != 0 ? L"Absolute Move" : L"Move";
+        }
+        else
+        {
+            name = L"Mouse";
+        }
+    }
+
+    return name;
+}
 
 class MainWindow final : public Window
 {
@@ -112,14 +217,14 @@ private:
         return true;
     }
 
-    void addKeyEventToListView(const RawKeyboard& rawKbd)
+    void addInputEventToListView(const InputEvent& inputEvent)
     {
         if (listView_.getItemCount() >= maxListViewItems_)
         {
             listView_.deleteItem(0);
         }
 
-        if (const int item = listView_.insertItem(listView_.getItemCount(), rawKbd); item >= 0)
+        if (const int item = listView_.insertItem(listView_.getItemCount(), inputEvent); item >= 0)
         {
             listView_.ensureVisible(item, false);
         }
@@ -281,6 +386,12 @@ private:
         return index < deviceNames_.size() ? deviceNames_[index] : otherDeviceName_;
     }
 
+    [[nodiscard]] const std::wstring& deviceNameFor(const RawMouse& rawMouse) const noexcept
+    {
+        const uint32_t index = rawMouse.getDeviceIndex();
+        return index < deviceNames_.size() ? deviceNames_[index] : otherDeviceName_;
+    }
+
     auto lookupVirtualKey(const RawKeyboard& rawKbd) const noexcept
     {
         auto it = vkeyMapping_.find(rawKbd.VKey);
@@ -351,61 +462,128 @@ private:
             return TRUE;
         };
 
-        switch (const RawKeyboard rawKbd(PackedRawKeyboard{item.lParam}.getRawKeyboard()); item.iSubItem)
+        const auto* inputEvent = reinterpret_cast<const InputEvent*>(item.lParam);
+        if (inputEvent == nullptr)
         {
-            case 0:
-            {
-                const auto it = lookupVirtualKey(rawKbd);
-                return formatTo(it->second.second.c_str(), item, listView_.getDisplayFormat(item.iSubItem));
-            }
-            case 1:
-            {
-                const auto it = lookupVirtualKey(rawKbd);
-                return formatTo(it->second.first.c_str(), item, listView_.getDisplayFormat(item.iSubItem));
-            }
-            case 2:
-            {
-                return formatTo(rawKbd.VKey, item, listView_.getDisplayFormat(item.iSubItem));
-            }
-            case 3:
-            {
-                return formatTo(rawKbd.MakeCode, item, listView_.getDisplayFormat(item.iSubItem));
-            }
-            case 4:
-            {
-                return formatTo(rawKbd.Flags, item, listView_.getDisplayFormat(item.iSubItem));
-            }
-            case 5:
-            {
-                switch (const auto it = lookupKeyCode(rawKbd); listView_.getDisplayFormat(item.iSubItem))
-                {
-                    case ListView::DisplayFormat::Sal:
-                    {
-                        return formatTo(it->second.sal, item, ListView::DisplayFormat::Sal);
-                    }
-                    case ListView::DisplayFormat::Ray:
-                    {
-                        return formatTo(it->second.ray, item, ListView::DisplayFormat::Ray);
-                    }
-                    case ListView::DisplayFormat::Glfw:
-                    {
-                        return formatTo(it->second.glfw, item, ListView::DisplayFormat::Glfw);
-                    }
-                }
-                break;
-            }
-            case 6:
-            {
-                const int keyCode = lookupKeyCode(rawKbd)->second.keyCode;
-                return formatTo(keyCode, item, listView_.getDisplayFormat(item.iSubItem), keyCode > 0 ? 1 : 2);
-            }
-            case 7:
-            {
-                return formatTo(deviceNameFor(rawKbd).c_str(), item, listView_.getDisplayFormat(item.iSubItem));
-            }
+            return std::nullopt;
         }
 
-        return std::nullopt; // Let DefWindowProcW() deal with unhandled messages
+        return std::visit(
+            [this, &item, &formatTo](const auto& input) -> std::optional<LRESULT>
+            {
+                using InputType = std::decay_t<decltype(input)>;
+                if constexpr (std::same_as<InputType, RawKeyboard>)
+                {
+                    switch (item.iSubItem)
+                    {
+                        case 0:
+                        {
+                            return formatTo(std::wstring_view{L"Keyboard"}, item, listView_.getDisplayFormat(item.iSubItem));
+                        }
+                        case 1:
+                        {
+                            const auto it = lookupVirtualKey(input);
+                            return formatTo(it->second.second.c_str(), item, listView_.getDisplayFormat(item.iSubItem));
+                        }
+                        case 2:
+                        {
+                            return formatTo(input.VKey, item, listView_.getDisplayFormat(item.iSubItem));
+                        }
+                        case 3:
+                        {
+                            return formatTo(input.MakeCode, item, listView_.getDisplayFormat(item.iSubItem));
+                        }
+                        case 4:
+                        {
+                            return formatTo(input.Flags, item, listView_.getDisplayFormat(item.iSubItem));
+                        }
+                        case 5:
+                        {
+                            switch (const auto it = lookupKeyCode(input); listView_.getDisplayFormat(item.iSubItem))
+                            {
+                                case ListView::DisplayFormat::Sal:
+                                {
+                                    return formatTo(it->second.sal, item, ListView::DisplayFormat::Sal);
+                                }
+                                case ListView::DisplayFormat::Ray:
+                                {
+                                    return formatTo(it->second.ray, item, ListView::DisplayFormat::Ray);
+                                }
+                                case ListView::DisplayFormat::Glfw:
+                                {
+                                    return formatTo(it->second.glfw, item, ListView::DisplayFormat::Glfw);
+                                }
+                            }
+                            break;
+                        }
+                        case 6:
+                        {
+                            const int keyCode = lookupKeyCode(input)->second.keyCode;
+                            return formatTo(keyCode, item, listView_.getDisplayFormat(item.iSubItem), keyCode > 0 ? 1 : 2);
+                        }
+                        case 7:
+                        {
+                            return formatTo(std::wstring_view{L"--"}, item, listView_.getDisplayFormat(item.iSubItem));
+                        }
+                        case 8:
+                        {
+                            return formatTo(deviceNameFor(input).c_str(), item, listView_.getDisplayFormat(item.iSubItem));
+                        }
+                    }
+                }
+                else
+                {
+                    switch (item.iSubItem)
+                    {
+                        case 0:
+                        {
+                            return formatTo(std::wstring_view{L"Mouse"}, item, listView_.getDisplayFormat(item.iSubItem));
+                        }
+                        case 1:
+                        {
+                            return formatTo(mouseEventName(input), item, listView_.getDisplayFormat(item.iSubItem));
+                        }
+                        case 2:
+                        {
+                            return formatTo(input.usButtonFlags, item, listView_.getDisplayFormat(item.iSubItem));
+                        }
+                        case 3:
+                        {
+                            const int buttonData = (input.usButtonFlags & (RI_MOUSE_WHEEL | RI_MOUSE_HWHEEL)) != 0
+                                ? static_cast<SHORT>(input.usButtonData)
+                                : static_cast<int>(input.usButtonData);
+                            return formatTo(buttonData, item, listView_.getDisplayFormat(item.iSubItem));
+                        }
+                        case 4:
+                        {
+                            return formatTo(input.usFlags, item, listView_.getDisplayFormat(item.iSubItem));
+                        }
+                        case 5:
+                        {
+                            return formatTo(input.lLastX, item, listView_.getDisplayFormat(item.iSubItem));
+                        }
+                        case 6:
+                        {
+                            return formatTo(input.lLastY, item, listView_.getDisplayFormat(item.iSubItem));
+                        }
+                        case 7:
+                        {
+                            const std::wstring details = std::format(
+                                L"raw={:#010x}, extra={:#010x}",
+                                static_cast<unsigned long>(input.ulRawButtons),
+                                static_cast<unsigned long>(input.ulExtraInformation));
+                            return formatTo(details, item, listView_.getDisplayFormat(item.iSubItem));
+                        }
+                        case 8:
+                        {
+                            return formatTo(deviceNameFor(input).c_str(), item, listView_.getDisplayFormat(item.iSubItem));
+                        }
+                    }
+                }
+
+                return std::nullopt;
+            },
+            *inputEvent);
     }
 
     [[nodiscard]] std::optional<LRESULT> customDrawListViewItem(NMLVCUSTOMDRAW* customDraw)
@@ -422,24 +600,38 @@ private:
             }
             case CDDS_ITEMPREPAINT | CDDS_SUBITEM:
             {
-                const AdjustmentFlags flags = AdjustmentFlags::MakeCodeMapped | AdjustmentFlags::VirtualKeyAdjusted;
-                const RawKeyboard rawKbd = PackedRawKeyboard{customDraw->nmcd.lItemlParam}.getRawKeyboard();
-                if ((rawKbd.adjustments & flags) != AdjustmentFlags{0})
+                const auto* inputEvent = reinterpret_cast<const InputEvent*>(customDraw->nmcd.lItemlParam);
+                if (inputEvent == nullptr)
                 {
-                    // Draw adjusted values (VK or scan code) in bold to hint to the user what was adjusted.
-                    int mask = (rawKbd.adjustments & AdjustmentFlags::VirtualKeyAdjusted) != AdjustmentFlags{0} ? 0b0110 : 0;
-                    mask |= (rawKbd.adjustments & AdjustmentFlags::MakeCodeMapped) != AdjustmentFlags{0} ? 0b1000 : 0;
-                    const bool bold = ((1 << customDraw->iSubItem) & mask) != 0;
-                    HFONT font = (bold && listView_.getBoldFont() != nullptr) ? listView_.getBoldFont() : listView_.getFont();
-                    if (font != nullptr)
-                    {
-                        SelectObject(customDraw->nmcd.hdc, font);
-                    }
-                    customDraw->clrText = GetSysColor(COLOR_INFOTEXT);
-                    customDraw->clrTextBk = GetSysColor(COLOR_INFOBK);
-                    return CDRF_NEWFONT;
+                    return CDRF_DODEFAULT;
                 }
-                return CDRF_DODEFAULT;
+
+                return std::visit(
+                    [this, customDraw](const auto& input) -> LRESULT
+                    {
+                        using InputType = std::decay_t<decltype(input)>;
+                        if constexpr (std::same_as<InputType, RawKeyboard>)
+                        {
+                            const AdjustmentFlags flags = AdjustmentFlags::MakeCodeMapped | AdjustmentFlags::VirtualKeyAdjusted;
+                            if ((input.adjustments & flags) != AdjustmentFlags{0})
+                            {
+                                // Draw adjusted values (VK or scan code) in bold to hint to the user what was adjusted.
+                                int mask = (input.adjustments & AdjustmentFlags::VirtualKeyAdjusted) != AdjustmentFlags{0} ? 0b0110 : 0;
+                                mask |= (input.adjustments & AdjustmentFlags::MakeCodeMapped) != AdjustmentFlags{0} ? 0b1000 : 0;
+                                const bool bold = ((1 << customDraw->iSubItem) & mask) != 0;
+                                HFONT font = (bold && listView_.getBoldFont() != nullptr) ? listView_.getBoldFont() : listView_.getFont();
+                                if (font != nullptr)
+                                {
+                                    SelectObject(customDraw->nmcd.hdc, font);
+                                }
+                                customDraw->clrText = GetSysColor(COLOR_INFOTEXT);
+                                customDraw->clrTextBk = GetSysColor(COLOR_INFOBK);
+                                return static_cast<LRESULT>(CDRF_NEWFONT);
+                            }
+                        }
+                        return static_cast<LRESULT>(CDRF_DODEFAULT);
+                    },
+                    *inputEvent);
             }
         }
 
@@ -467,7 +659,7 @@ private:
         try
         {
             toolBar_.create(hinstance_, *this);
-            listView_.create<IDS_COLUMNS>(hinstance_, *this);
+            listView_.create<IDS_INPUT_COLUMNS>(hinstance_, *this);
             statusBar_.create(hinstance_, *this);
             return 0;
         }
@@ -509,12 +701,16 @@ private:
 
                 if (!toolBar_.isAdjustmentChecked() || adjustKeyboardInput(rawKbd))
                 {
-                    addKeyEventToListView(rawKbd);
+                    addInputEventToListView(InputEvent{rawKbd});
                 }
                 break;
             }
             case RIM_TYPEMOUSE:
             {
+                RawMouse rawMouse(raw->data.mouse);
+                rawMouse.setDeviceIndex(deviceIndexFor(raw->header.hDevice));
+                addInputEventToListView(InputEvent{rawMouse});
+
                 if (raw->data.mouse.usButtonFlags & RI_MOUSE_RIGHT_BUTTON_UP)
                 {
                     clearListView();
@@ -868,9 +1064,25 @@ private:
             recreateBoldFont();
         }
 
-        int insertItem(int position, const RawKeyboard& rawKbd)
+        int insertItem(int position, const InputEvent& inputEvent)
         {
             _ASSERT(IsWindow(hwnd_));
+
+            auto itemData = std::make_unique<InputEvent>(inputEvent);
+            const int image = std::visit(
+                [](const auto& input) -> int
+                {
+                    using InputType = std::decay_t<decltype(input)>;
+                    if constexpr (std::same_as<InputType, RawKeyboard>)
+                    {
+                        return input.isKeyDown ? 0 : 1;
+                    }
+                    else
+                    {
+                        return -1;
+                    }
+                },
+                *itemData);
 
             // clang-format off
             LVITEMW item
@@ -878,8 +1090,8 @@ private:
                 .mask = LVIF_TEXT | LVIF_IMAGE | LVIF_PARAM,
                 .iItem = static_cast<int>(position),
                 .pszText = LPSTR_TEXTCALLBACKW,
-                .iImage = rawKbd.isKeyDown ? 0 : 1,
-                .lParam = PackedRawKeyboard(rawKbd).lParam
+                .iImage = image,
+                .lParam = reinterpret_cast<LPARAM>(itemData.get())
             };
             // clang-format on
             position = ListView_InsertItem(hwnd_, &item);
@@ -887,6 +1099,7 @@ private:
             {
                 return position;
             }
+            itemData.release();
 
             const int subItemCount = Header_GetItemCount(hwndHeader_);
             for (int i = 1; i < subItemCount; ++i)
@@ -933,13 +1146,20 @@ private:
         void deleteAllItems() noexcept
         {
             _ASSERT(IsWindow(hwnd_));
-            ListView_DeleteAllItems(hwnd_);
+            for (int item = getItemCount() - 1; item >= 0; --item)
+            {
+                deleteItem(item);
+            }
         }
 
         void deleteItem(int item) noexcept
         {
             _ASSERT(IsWindow(hwnd_));
-            ListView_DeleteItem(hwnd_, item);
+            LVITEMW itemData{.mask = LVIF_PARAM, .iItem = item};
+            if (ListView_GetItem(hwnd_, &itemData) && ListView_DeleteItem(hwnd_, item))
+            {
+                delete reinterpret_cast<InputEvent*>(itemData.lParam);
+            }
         }
 
         [[nodiscard]] bool isHeader(HWND hwnd) const noexcept
@@ -1113,9 +1333,13 @@ private:
 
         [[nodiscard]] std::optional<LRESULT> dispatchMessage(HWND, UINT msg, WPARAM, LPARAM) override
         {
-            if (msg == WM_DESTROY && hfontBold_ != nullptr)
+            if (msg == WM_DESTROY)
             {
-                DeleteObject(std::exchange(hfontBold_, nullptr));
+                deleteAllItems();
+                if (hfontBold_ != nullptr)
+                {
+                    DeleteObject(std::exchange(hfontBold_, nullptr));
+                }
             }
             return std::nullopt;
         }

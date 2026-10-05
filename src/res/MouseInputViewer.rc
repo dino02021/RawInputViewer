@@ -1,0 +1,6 @@
+#include "resource.h"
+
+STRINGTABLE
+BEGIN
+    IDS_INPUT_COLUMNS "Type;140;0;0;0|Event;240;0;0;0|Code / Button Flags;150;1;1100;1101|Data / Button Data;150;1;1100;1102|Flags;120;1;1200;1201|Key Code / X;240;0;1300;1301|Key Code # / Y;140;1;1100;1101|Raw Buttons / Extra;220;0;0;0|Input Device;260;0;0;0"
+END

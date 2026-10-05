@@ -9,8 +9,9 @@ A utility to test, visualize, and map WM_INPUT messages. Windows only.
 ## What it does
 
 RawInputViewer listens for [`WM_INPUT`](https://learn.microsoft.com/en-us/windows/win32/inputdev/wm-input)
-keyboard messages and shows each event in a list view: virtual key, scan code, flags, SAL,
-Raylib, and GLFW key name mappings, and which physical device sent the input.
+keyboard and mouse messages and shows each event in a list view. Keyboard rows include virtual
+key, scan code, flags, SAL, Raylib, and GLFW key name mappings. Mouse rows include button and
+wheel events, movement deltas, raw button data, flags, and the physical device that sent the input.
 
 ## Download
 
@@ -26,9 +27,9 @@ release builds are not code signed. To compile your own copy, see [How to Build]
 
 ## Using the app
 
-Press keys on any connected keyboard. Each key down and key up appears as a new row. Values
-that **Adjust** mode changed are drawn in **bold**. The list keeps the most recent 10,000
-rows and drops the oldest when that cap is reached.
+Press keys on any connected keyboard, or move, click, and scroll any connected mouse. Each raw
+keyboard or mouse event appears as a new row. Values that **Adjust** mode changed are drawn in
+**bold**. The list keeps the most recent 10,000 rows and drops the oldest when that cap is reached.
 
 Clear the list with the **Clear** button on the main toolbar, or with a right click anywhere.
 The app registers for raw mouse input and treats a right button release as clear.
@@ -56,7 +57,7 @@ If re-registration fails, the toggle returns to its previous state.
 
 Click the arrow on a numeric column header to change the display format where that is supported:
 
-- **Decimal**, **Hexadecimal**, or **Binary** for virtual key, make code, flags, and key code columns
+- **Decimal**, **Hexadecimal**, or **Binary** for numeric keyboard and mouse fields
 - **SAL**, **Raylib**, or **GLFW** for the key code name column
 
 Window size, column widths, and display formats are saved under `HKEY_CURRENT_USER` and

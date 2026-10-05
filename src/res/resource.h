@@ -26,6 +26,7 @@
 #define IDS_DEVICE_INJECTED             1012
 #define IDS_DEVICE_OTHER                1013
 #define IDS_DEVICE_UNKNOWN              1014
+#define IDS_INPUT_COLUMNS               115
 #define IDR_POPUP_MENU_DEC_OR_HEX       1100
 #define IDC_POPUP_DEC                   1101
 #define IDC_POPUP_HEX                   1102

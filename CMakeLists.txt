@@ -32,6 +32,7 @@ target_sources(${PROJECT_NAME}
         # Resource files are here as workaround to ensure
         # source_group "Resource Files" is generated.
         "src/res/${PROJECT_NAME}.rc"
+        "src/res/MouseInputViewer.rc"
         "src/res/${PROJECT_NAME}.ico"
         "src/res/${PROJECT_NAME}.manifest"
         "src/res/ScanCodeMapping.txt"
@@ -47,6 +48,7 @@ target_sources(${PROJECT_NAME}
 source_group("Resource Files"
     FILES
         "src/res/${PROJECT_NAME}.rc"
+        "src/res/MouseInputViewer.rc"
         "src/res/${PROJECT_NAME}.ico"
         "src/res/ScanCodeMapping.txt"
         "src/res/VirtualKeyMapping.txt"
@@ -55,7 +57,10 @@ source_group("Resource Files"
         "src/res/ToolBar.bmp"
 )
 
-set_source_files_properties("src/res/${PROJECT_NAME}.rc" PROPERTIES LANGUAGE RC)
+set_source_files_properties(
+    "src/res/${PROJECT_NAME}.rc"
+    "src/res/MouseInputViewer.rc"
+    PROPERTIES LANGUAGE RC)
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY VS_DPI_AWARE "PerMonitor")
 set_property(TARGET ${PROJECT_NAME} PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")

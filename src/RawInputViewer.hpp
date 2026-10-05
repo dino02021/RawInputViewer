@@ -1013,48 +1013,6 @@ public:
     const bool isKeyDown;
 };
 
-union PackedRawKeyboard
-{
-    struct PackedRawKeyboardBits
-    {
-        uint32_t makeCode : 8;
-        uint32_t flags : 8;
-        uint32_t vKey : 8;
-        AdjustmentFlags adjustments : 8;
-    } bits;
-    LPARAM lParam;
-
-    explicit PackedRawKeyboard(const RawKeyboard& rawkbd) noexcept
-        : lParam{0}
-    {
-        bits = {
-            .makeCode = static_cast<uint32_t>(rawkbd.MakeCode) & 0xffu,
-            .flags = static_cast<uint32_t>(rawkbd.Flags) & 0xffu,
-            .vKey = static_cast<uint32_t>(rawkbd.VKey) & 0xffu,
-            .adjustments = static_cast<AdjustmentFlags>(std::to_underlying(rawkbd.adjustments) & 0xffu)};
-    }
-
-    explicit PackedRawKeyboard(LPARAM lParam) noexcept
-        : lParam{lParam}
-    {
-    }
-
-    [[nodiscard]] RawKeyboard getRawKeyboard() const noexcept
-    {
-        // clang-format off
-        const RAWKEYBOARD unpacked
-        {
-            .MakeCode = static_cast<USHORT>(bits.makeCode),
-            .Flags = static_cast<USHORT>(bits.flags),
-            .VKey = static_cast<USHORT>(bits.vKey)
-        };
-        // clang-format on
-        return RawKeyboard{unpacked, bits.adjustments};
-    }
-};
-
-static_assert(sizeof(PackedRawKeyboard) == sizeof(LPARAM), "PackedRawKeyboard must be the size of LPARAM");
-
 struct ListViewHeaderProperties
 {
     int checkedMenuItemId;
