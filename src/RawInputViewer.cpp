@@ -712,10 +712,6 @@ private:
 
                 addInputEventToListView(InputEvent{rawMouse});
 
-                if (rawMouse.usButtonFlags & RI_MOUSE_RIGHT_BUTTON_UP)
-                {
-                    clearListView();
-                }
                 break;
             }
         }

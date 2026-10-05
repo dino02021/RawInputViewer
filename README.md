@@ -32,8 +32,8 @@ movement is ignored, while each raw keyboard, button, or wheel event appears as 
 Values that **Adjust** mode changed are drawn in **bold**. The list keeps the most recent 10,000
 rows and drops the oldest when that cap is reached.
 
-Clear the list with the **Clear** button on the main toolbar, or with a right click anywhere.
-The app registers for raw mouse input and treats a right button release as clear.
+Clear the list with the **Clear** button on the main toolbar. Right-click events remain in the
+list like other mouse button events.
 
 ### Main toolbar
 
