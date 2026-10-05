@@ -111,14 +111,7 @@ using InputEvent = std::variant<RawKeyboard, RawMouse>;
 
     if (name.empty())
     {
-        if (rawMouse.lLastX != 0 || rawMouse.lLastY != 0)
-        {
-            name = (rawMouse.usFlags & MOUSE_MOVE_ABSOLUTE) != 0 ? L"Absolute Move" : L"Move";
-        }
-        else
-        {
-            name = L"Mouse";
-        }
+        name = L"Mouse";
     }
 
     return name;
@@ -709,9 +702,17 @@ private:
             {
                 RawMouse rawMouse(raw->data.mouse);
                 rawMouse.setDeviceIndex(deviceIndexFor(raw->header.hDevice));
+
+                // Ignore pure movement packets. Button and wheel events still carry their
+                // complete RAWMOUSE payload, including any movement reported with the event.
+                if (rawMouse.usButtonFlags == 0)
+                {
+                    break;
+                }
+
                 addInputEventToListView(InputEvent{rawMouse});
 
-                if (raw->data.mouse.usButtonFlags & RI_MOUSE_RIGHT_BUTTON_UP)
+                if (rawMouse.usButtonFlags & RI_MOUSE_RIGHT_BUTTON_UP)
                 {
                     clearListView();
                 }
